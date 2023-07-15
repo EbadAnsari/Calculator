@@ -20,60 +20,182 @@ import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
 
+import MathFunctions.Eval;
+
 public class Calculator implements ActionListener {
 
 	private JFrame frame;
-	private JLabel numberInput;
+
+	/**
+	 * It is used to store current latest expression, including all operators.
+	 */
+	private JLabel inputNumber;
+
+	/**
+	 * It is used to store previous expression, except all trigo. functions.
+	 */
 	private JLabel resultNumberInput;
 	private JPanel inputPanel;
 	private JPanel buttonsPanel;
 
-	private Stack<String> lastInputDigit = new Stack<>();
+	private StringBuilder numberOne = new StringBuilder();
+	private StringBuilder numberTwo = new StringBuilder();
+	private String operator = "";
 
-	// private String[] lastInputDigit = {};
+	private Stack<String> inputNumberStack = new Stack<>();
+	private Stack<String> resultNumberStack = new Stack<>();
+	private String lastDigit = "";
+	private boolean isOperatorIn = false;
 
-	private final Color buttonColorGrey = new Color(242, 242, 242);
+	private final Color defaultBackgroundColor = new Color(238, 238, 238);
+	private final Color buttonColorGrey = new Color(240, 240, 240);
 	private final Color buttonColorLightBlue = new Color(223, 244, 255);
 	private final Color buttonColorDarkBlue = new Color(0, 99, 153);
 	private final Color buttonColorLightPink = new Color(255, 220, 240);
+	private final Color evaluateButtonColorGreen = new Color(54, 233, 114);
 
-	private final String[] buttonText = { "+", "-", "/", "*", "<", "7", "8", "9", "sin", "log", "4", "5", "6", "cos",
-			"pi", "1", "2", "3", "tan", "e", "0", ".", "=", "sqrt", "sqr" };
+	private final Color errorTextColorRed = new Color(255, 0, 0);
+	private final Color errorBackgroundColorRed = new Color(255, 217, 217);
 
-	private String stackToString() {
-		return lastInputDigit.toString().substring(1, lastInputDigit.toString().length() - 1).replaceAll(", ", "");
+	private final String[][] buttonText = { { "+", "-", "/", "*", "C" }, { "7", "8", "9", "sin", "log" },
+			{ "4", "5", "6", "cos", "pi" }, { "1", "2", "3", "tan", "e" }, { "0", ".", "=", "sqrt", "sqr" } };
+
+	private boolean isInt(String number) {
+		String[] splitResult = number.split("[.]");
+		if (splitResult.length <= 1)
+			return true;
+
+		if ("0".equals(splitResult[1]))
+			return true;
+
+		return false;
+	}
+
+	private void updateResultNumberInput() {
+		// resultNumberInput.setText(stackToString(resultNumberStack));
+		// if (operator.length() != 0)
+		resultNumberInput.setText(numberOne + operator);
+	}
+
+	private void updateNumberInput() {
+		if (operator.length() == 0)
+			inputNumber.setText(numberOne.toString());
+		else
+			inputNumber.setText(numberTwo.toString());
+		// inputNumber.setText(stackToString(inputNumberStack));
+	}
+
+	private String stackToString(Stack<String> stk) {
+		return stk.toString().substring(1, stk.toString().length() - 1).replaceAll(", ", "");
+	}
+
+	private void cloneStack(Stack<String> srcStk, Stack<String> destStk) {
+		if (srcStk.empty())
+			return;
+		String string = srcStk.pop();
+		cloneStack(srcStk, destStk);
+		srcStk.push(string);
+		destStk.push(string);
+	}
+
+	private String emptyStack(Stack<String> stk) {
+		if (stk.empty())
+			return "";
+		String last = stk.pop();
+		return emptyStack(stk) + last;
 	}
 
 	private boolean isDot() {
-		return ".".equals(lastInputDigit.peek());
+		return ".".equals(lastDigit);
 	}
 
 	private boolean isNumber() {
-		return (lastInputDigit.peek().length() == 1 && 48 <= lastInputDigit.peek().charAt(0)
-				&& lastInputDigit.peek().charAt(0) <= 57);
+		return (lastDigit.length() == 1 && 48 <= lastDigit.charAt(0) && lastDigit.charAt(0) <= 57);
 	}
 
 	private boolean isFunction() {
-		return ("log".equals(lastInputDigit.peek()) || "sin".equals(lastInputDigit.peek())
-				|| "cos".equals(lastInputDigit.peek()) || "pi".equals(lastInputDigit.peek())
-				|| "tan".equals(lastInputDigit.peek()) || "e".equals(lastInputDigit.peek())
-				|| "sqrt".equals(lastInputDigit.peek()) || "sqr".equals(lastInputDigit.peek()));
+		return ("log".equals(lastDigit) || "sin".equals(lastDigit) || "cos".equals(lastDigit) || "pi".equals(lastDigit)
+				|| "tan".equals(lastDigit) || "e".equals(lastDigit) || "sqrt".equals(lastDigit)
+				|| "sqr".equals(lastDigit));
 	}
 
-	private boolean isOperator() {
-		return ("+".equals(lastInputDigit.peek()) || "-".equals(lastInputDigit.peek())
-				|| "/".equals(lastInputDigit.peek()) || "*".equals(lastInputDigit.peek()));
+	private boolean isOperator(String operator) {
+		return ("+".equals(operator) || "-".equals(operator) || "/".equals(operator) || "*".equals(operator));
+	}
+
+	private void evaluate() {
+		if (operator.length() != 0 && !numberOne.isEmpty() && !numberTwo.isEmpty()) {
+			final float numOne = Float.parseFloat(numberOne.toString());
+			final float numTwo = Float.parseFloat(numberTwo.toString());
+
+			// numberOne = new StringBuilder();
+
+			try {
+				numberOne = new StringBuilder("" + Eval.evalArithmetic(numOne, operator.charAt(0), numTwo));
+			} catch (ArithmeticException error) {
+				System.out.println(error.getMessage());
+				inputNumber.setForeground(errorTextColorRed);
+				inputPanel.setBackground(errorBackgroundColorRed);
+				resultNumberInput.setForeground(errorTextColorRed);
+				return;
+			}
+
+			if (isInt(numberOne.toString())) {
+				numberOne = new StringBuilder(numberOne.toString().split("[.]")[0]);
+			}
+
+			numberTwo = new StringBuilder("");
+			operator = "";
+		}
+	}
+
+	private void clearInput() {
+		emptyStack(inputNumberStack);
+		emptyStack(resultNumberStack);
+		lastDigit = "";
+		updateNumberInput();
+		updateResultNumberInput();
 	}
 
 	private void getInput() {
-		numberInput.setText(numberInput.getText() + lastInputDigit.peek());
+
+		inputNumber.setForeground(Color.BLACK);
+		inputPanel.setBackground(defaultBackgroundColor);
+		resultNumberInput.setForeground(Color.BLACK);
+
+		if ("C".equals(lastDigit)) {
+			backSpace();
+		} else if ("=".equals(lastDigit)) {
+			evaluate();
+		} else {
+			if (isOperator(lastDigit)) {
+				evaluate();
+			}
+
+			if (isOperator(lastDigit)) {
+				operator = lastDigit;
+			} else if (operator.length() == 0) {
+				if (isDot() && numberOne.indexOf(".") == -1) {
+					numberOne.append(lastDigit);
+				} else if (!isDot()) {
+					numberOne.append(lastDigit);
+				}
+			} else if (operator.length() != 0) {
+				numberTwo.append(lastDigit);
+			}
+
+		}
+
+		updateNumberInput();
+		updateResultNumberInput();
+
 	}
 
 	private void backSpace() {
-		if (lastInputDigit.empty())
+		if (inputNumberStack.empty())
 			return;
-		lastInputDigit.pop();
-		numberInput.setText(stackToString());
+		inputNumberStack.pop();
+		inputNumber.setText(stackToString(inputNumberStack));
 	}
 
 	private void initFrame() {
@@ -89,12 +211,6 @@ public class Calculator implements ActionListener {
 		frame.setBackground(buttonColorGrey);
 	}
 
-	private void initBufferNumberInput() {
-		resultNumberInput = new JLabel(lastInputDigit.peek());
-		resultNumberInput.setHorizontalAlignment(SwingConstants.RIGHT);
-		resultNumberInput.setBorder(BorderFactory.createEmptyBorder(30, 0, 0, 15));
-	}
-
 	private void initButtonPanel() {
 		buttonsPanel = new JPanel(new GridLayout(5, 5));
 		buttonsPanel.setBackground(buttonColorGrey);
@@ -103,17 +219,26 @@ public class Calculator implements ActionListener {
 	private void initInputPanel() {
 		inputPanel = new JPanel(new BorderLayout());
 		inputPanel.setPreferredSize(new Dimension(frame.getWidth(), frame.getHeight() * 25 / 100));
-		inputPanel.add(numberInput, BorderLayout.CENTER);
+		inputPanel.add(inputNumber, BorderLayout.CENTER);
 		inputPanel.add(resultNumberInput, BorderLayout.BEFORE_FIRST_LINE);
 	}
 
 	private void initInputText() {
-		numberInput = new JLabel(lastInputDigit.peek());
-		numberInput.setHorizontalAlignment(SwingConstants.RIGHT);
-		Font font = numberInput.getFont();
-		float fontSize = font.getSize() + 10;
-		numberInput.setFont(font.deriveFont(fontSize));
-		numberInput.setBorder(BorderFactory.createEmptyBorder(0, 0, 30, 15));
+		inputNumber = new JLabel(!inputNumberStack.empty() ? inputNumberStack.peek() : "");
+		inputNumber.setHorizontalAlignment(SwingConstants.RIGHT);
+		inputNumber.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 15));
+		Font font = inputNumber.getFont();
+		float fontSize = font.getSize() + 20;
+		inputNumber.setFont(font.deriveFont(fontSize));
+	}
+
+	private void initBufferNumberInput() {
+		resultNumberInput = new JLabel(!inputNumberStack.empty() ? inputNumberStack.peek() : "");
+		resultNumberInput.setHorizontalAlignment(SwingConstants.RIGHT);
+		resultNumberInput.setBorder(BorderFactory.createEmptyBorder(30, 0, 0, 15));
+		Font font = resultNumberInput.getFont();
+		float fontSize = font.getSize() + 3;
+		resultNumberInput.setFont(font.deriveFont(fontSize));
 	}
 
 	private JButton createButton(String buttonText, Color buttonColor) {
@@ -136,13 +261,18 @@ public class Calculator implements ActionListener {
 
 			@Override
 			public void mousePressed(MouseEvent e) {
-				if ("<".equals(buttonText)) {
-					backSpace();
-				} else {
-					lastInputDigit.push(buttonText);
-					getInput();
-				}
-				System.out.println(stackToString());
+				lastDigit = buttonText;
+				// if ("C".equals(buttonText)) {
+				// backSpace();
+				// } else if ("=".equals(lastDigit)) {
+				// System.out.println(buttonText);
+				// evaluate();
+				// } else {
+				getInput();
+				// }
+				// System.out.print(stackToString(resultNumberStack) + " ");
+				// System.out.print(stackToString(inputNumberStack));
+				// System.out.println();
 			}
 
 			@Override
@@ -157,7 +287,7 @@ public class Calculator implements ActionListener {
 
 	public Calculator() {
 
-		lastInputDigit.push("Hello");
+		// inputNumberStack.push("");
 
 		initFrame();
 		initButtonPanel();
@@ -165,12 +295,22 @@ public class Calculator implements ActionListener {
 		initBufferNumberInput();
 		initInputPanel();
 
-		for (int i = 1; i <= 25; i++) {
-			if ((i % 5) == 0)
-				buttonsPanel.add(createButton(buttonText[i - 1], buttonColorLightPink));
-			else
-				buttonsPanel.add(createButton(buttonText[i - 1], buttonColorGrey));
+		for (int i = 1; i <= buttonText.length; i++) {
+			for (int j = 1; j <= buttonText[i - 1].length; j++) {
+				final String btnTxt = buttonText[i - 1][j - 1];
+
+				if ("=".equals(btnTxt)) {
+					buttonsPanel.add(createButton(btnTxt, evaluateButtonColorGreen));
+				} else if (j == buttonText[i - 1].length) {
+					buttonsPanel.add(createButton(btnTxt, buttonColorLightPink));
+				} else {
+					buttonsPanel.add(createButton(btnTxt, buttonColorGrey));
+				}
+			}
 		}
+
+		// for (int i = 1; i <= 25; i++) {
+		// }
 
 		frame.add(inputPanel, BorderLayout.NORTH);
 		frame.add(buttonsPanel);
